@@ -1141,7 +1141,13 @@ export const submitDraftResponse = async (responseId: string, userId: string) =>
             status: true,
             supplier: true,
             documents: true,
-            rfp: true,
+            rfp: {
+                include: {
+                    current_version: true,
+                    status: true,
+                    buyer: true,
+                },
+            },
         },
     });
 

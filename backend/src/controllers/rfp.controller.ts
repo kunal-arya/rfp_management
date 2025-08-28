@@ -453,7 +453,7 @@ export const reopenResponseForEdit = async (req: AuthenticatedRequest, res: Resp
     }
 
     try {
-        const updatedResponse = await rfpService.reopenResponseForEdit(response_id, user.userId);
+        const updatedResponse = await rfpService.reopenResponseForEdit(response_id, user);
         res.json(updatedResponse);
     } catch (error: any) {
         if (error.message === 'Response not found') {
