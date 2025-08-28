@@ -18,8 +18,10 @@ RFPFlow streamlines the entire RFP lifecycle from creation to completion, enabli
 - **Complete CRUD Operations**: Create, read, update, delete RFPs with validation
 - **Status Workflow**: `Draft → Published → Response Submitted → Under Review → Approved/Rejected → Awarded`
 - **Version Control**: Track RFP changes and iterations with full versioning support
+- **Soft Delete**: Safe RFP deletion with recovery capability
 - **Deadline Management**: Automated deadline tracking and notifications
 - **Award Management**: Complete awarding workflow with winner tracking
+- **Reopen Responses**: Ability to reopen rejected responses for editing
 
 ### 🔍 Advanced Search & Filtering
 - **Full-text Search**: Database-driven search across RFP content and metadata
@@ -27,23 +29,50 @@ RFPFlow streamlines the entire RFP lifecycle from creation to completion, enabli
 - **Real-time Results**: Instant search with debounced queries and pagination
 - **Advanced Query Builder**: Complex filtering with multiple criteria
 
+### 📝 Response Management
+- **Draft Creation**: Suppliers can create response drafts before submission
+- **Complete Workflow**: `Draft → Submitted → Under Review → Approved/Rejected → Awarded`
+- **Status Transitions**: Buyers can move responses through approval workflow
+- **Rejection Handling**: Detailed rejection reasons with reopen capability
+- **Award System**: Single winner selection per RFP with notifications
+- **Document Attachments**: Multiple file uploads per response
+
 ### 📄 Document Management
 - **File Upload/Download**: Cloudinary integration for secure file storage
 - **Multiple Format Support**: PDF, Word, Excel, images with preview
-- **Document Versioning**: Track document changes and history
+- **Soft Delete**: Safe document deletion with recovery
 - **File Validation**: Type checking, size limits, and security validation
+- **Dual Association**: Documents can be attached to RFPs or responses
 
 ### 🔔 Real-time Notifications
 - **WebSocket Integration**: Socket.IO for instant updates across all users
 - **Email Notifications**: SendGrid for automated email alerts with HTML templates
-- **Event-driven Architecture**: Automatic notifications on all status changes
-- **In-app Notifications**: Real-time notification system with read/unread tracking
+- **Template System**: Dynamic notification templates with placeholders
+- **Multi-channel Delivery**: In-app, email, or both delivery options
+- **Smart Filtering**: Users don't receive notifications for their own actions
+- **Comprehensive Events**: Notifications for all CRUD operations and status changes
+- **Read Tracking**: Mark individual or all notifications as read
+- **Role-specific**: Different notifications for buyers, suppliers, and admins
+
+**Notification Events:**
+- User registration (admin notification)
+- RFP creation, publishing, status changes
+- Response draft creation, submission, approval, rejection, reopening
+- Document uploads and deletions
+- Award announcements
+
+### 👨‍💼 Admin Panel
+- **User Management**: Create, update, activate/deactivate users
+- **Permission Management**: Dynamic role-based permissions via UI
+- **System Analytics**: Comprehensive dashboard with system metrics
+- **Audit Trail Review**: Complete
 
 ### 📊 Data Visualization & Analytics
 - **Interactive Charts**: RFP status distribution and analytics with Recharts
 - **Role-specific Dashboards**: Customized views for buyers and suppliers
 - **Export Capabilities**: PDF/Excel export with print-friendly views
 - **Statistics Tracking**: Comprehensive metrics and reporting
+- **Audit Analytics**: Activity tracking and user behavior insights
 
 ### 🚀 Modern UI/UX
 - **Responsive Design**: Mobile-first approach with Tailwind CSS v4
@@ -187,7 +216,6 @@ pnpm test:coverage     # Run tests with coverage report
 
 The API documentation is available at:
 - **Development**: `http://localhost:3000/api-docs`
-- **Swagger JSON**: `http://localhost:3000/api-docs.json`
 
 ### Key Endpoints
 
@@ -216,15 +244,16 @@ The API documentation is available at:
 #### Responses
 - `GET /api/rfp/my-responses` - Get user's responses (suppliers)
 - `GET /api/rfp/:id/responses` - Get responses for RFP (buyers)
-- `POST /api/rfp/:id/responses` - Submit response to RFP
+- `POST /api/rfp/:id/responses` - Create response draft (suppliers)
 - `GET /api/rfp/responses/:responseId` - Get response details
-- `PUT /api/rfp/responses/:responseId` - Update response
-- `DELETE /api/rfp/responses/:responseId` - Delete response
-- `PUT /api/rfp/responses/:responseId/submit` - Submit response
-- `PUT /api/rfp/responses/:responseId/approve` - Approve response
-- `PUT /api/rfp/responses/:responseId/reject` - Reject response
-- `PUT /api/rfp/responses/:responseId/award` - Award response
-- `PUT /api/rfp/responses/:responseId/move-to-review` - Move to review
+- `PUT /api/rfp/responses/:responseId` - Update response draft
+- `DELETE /api/rfp/responses/:responseId` - Delete response draft
+- `PUT /api/rfp/responses/:responseId/submit` - Submit response for review
+- `PUT /api/rfp/responses/:responseId/approve` - Approve submitted response
+- `PUT /api/rfp/responses/:responseId/reject` - Reject response with reason
+- `PUT /api/rfp/responses/:responseId/award` - Award RFP to response
+- `PUT /api/rfp/responses/:responseId/move-to-review` - Move to review status
+- `PUT /api/rfp/responses/:responseId/reopen` - Reopen rejected response
 
 #### Dashboard
 - `GET /api/dashboard` - Get role-specific dashboard data
@@ -240,6 +269,18 @@ The API documentation is available at:
 - `PUT /api/notifications/:id/read` - Mark notification as read
 - `PUT /api/notifications/read-all` - Mark all as read
 
+#### Admin Panel
+- `GET /api/admin/users` - Get all users (admin)
+- `POST /api/admin/users` - Create new user (admin)
+- `PUT /api/admin/users/:id` - Update user (admin)
+- `PUT /api/admin/users/:id/status` - Activate/deactivate user (admin)
+- `GET /api/admin/roles` - Get all roles and permissions
+- `GET /api/admin/roles/:roleName/permissions` - Get role permissions
+- `PUT /api/admin/roles/:roleName/permissions` - Update role permissions
+- `GET /api/admin/responses` - Get all responses (admin)
+- `GET /api/admin/rfps` - Get all RFPs (admin)
+- `GET /api/admin/dashboard` - Admin dashboard analytics
+
 #### Audit Trail
 - `GET /api/audit/my` - Get user's audit trail
 - `GET /api/audit/target/:targetType/:targetId` - Get target audit trail
@@ -252,16 +293,34 @@ For complete API documentation, see [docs/api-docs.md](./docs/api-docs.md)
 
 ## 🗄 Database Schema
 
-The system uses PostgreSQL with the following key entities:
+The system uses PostgreSQL with Prisma ORM and includes comprehensive relationships:
 
-- **Users**: Authentication and profile information with role relationships
-- **Roles**: Dynamic role definitions with JSON permissions
-- **RFPs**: Request for proposal records with status tracking
-- **RFPVersions**: Versioned RFP content with document attachments
-- **SupplierResponses**: Supplier responses to RFPs with status workflow
-- **Documents**: File attachments and metadata with Cloudinary integration
-- **Notifications**: System notifications and templates with read tracking
-- **AuditTrail**: Comprehensive activity logging for all user actions
+### Core Entities
+- **Users**: Authentication, profiles, and role-based access with status tracking
+- **Roles**: Dynamic RBAC with JSON-based permissions and scope definitions
+- **RFPs**: Request for proposals with versioning, soft delete, and award tracking
+- **RFPVersions**: Version-controlled RFP content with document attachments
+- **SupplierResponses**: Complete response workflow with status lifecycle
+- **Documents**: Cloud storage integration with soft delete and dual associations
+- **Notifications**: Template-based notifications with multi-channel delivery
+- **AuditTrail**: Complete activity logging for compliance and monitoring
+
+### Key Features
+- **Soft Delete Support**: Safe deletion with recovery for RFPs and documents
+- **Version Control**: RFP versioning with current version tracking
+- **Award Management**: Single winner per RFP with comprehensive tracking
+- **Comprehensive Timestamps**: Creation, updates, and status change tracking
+- **Audit Compliance**: Complete activity logging for all CRUD operations
+- **Real-time Notifications**: WebSocket integration with email fallbacks
+
+### Relationships
+- **Users** → **RFPs** (Buyer creates RFPs)
+- **Users** → **SupplierResponses** (Supplier submits responses)
+- **RFPs** → **RFPVersions** (One-to-many with current version tracking)
+- **RFPs** → **SupplierResponses** (One RFP, many responses)
+- **RFPs** → **Documents** (RFP attachments)
+- **SupplierResponses** → **Documents** (Response attachments)
+- **Users** → **AuditTrail** (User activity logging)
 
 For detailed schema information, see [docs/database-schema.md](./docs/database-schema.md)
 
@@ -291,19 +350,32 @@ For complete permissions documentation, see [docs/permissions.md](./docs/permiss
 ## 🔄 Real-time Features
 
 ### WebSocket Events
-- `rfp_published` - New RFP published (to suppliers)
-- `response_submitted` - New response submitted (to buyers)
+- `user_created` - New user registration (to admins)
+- `rfp_created` - New RFP created (to admins)
+- `rfp_published` - RFP published (to suppliers, buyers, admins)
+- `response_draft_created` - Response draft created (to admins)
+- `response_submitted` - Response submitted (to buyers, admins)
+- `response_moved_to_review` - Response moved to review (to suppliers, admins)
+- `response_approved` - Response approved (to suppliers, admins)
+- `response_rejected` - Response rejected (to suppliers, admins)
+- `response_reopened` - Response reopened (to suppliers, admins)
+- `response_awarded` - RFP awarded (to winner, buyer, admins)
 - `rfp_status_changed` - RFP status updated (to relevant users)
-- `response_status_changed` - Response status updated (to relevant users)
-- `rfp_awarded` - RFP awarded (to winner and buyer)
-- `notification` - New notification received
+- `document_uploaded` - Document uploaded (to relevant users)
+- `document_deleted` - Document deleted (to relevant users)
 
 ### Email Notifications
-- RFP published notifications with HTML templates
-- Response submission alerts with detailed information
-- Status change notifications with context
-- Deadline reminders with action links
-- Award notifications with celebration messaging
+- User registration confirmations with welcome messages
+- RFP creation notifications for admin oversight
+- RFP publishing alerts with detailed RFP information
+- Response draft creation alerts for admin monitoring
+- Response submission notifications with proposal details
+- Status change alerts with context and next steps
+- Approval notifications with congratulations
+- Rejection notifications with detailed feedback
+- Reopening notifications with editing instructions
+- Award announcements with celebration messaging
+- Document upload confirmations
 
 ## 📁 Project Structure
 

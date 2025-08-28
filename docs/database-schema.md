@@ -2,6 +2,17 @@
 
 This document outlines the database schema for the RFP management system, managed by Prisma.
 
+## Overview
+
+This is a PostgreSQL database schema designed for a comprehensive RFP (Request for Proposal) management system. The system supports:
+
+- **Multi-role User Management**: Buyers, Suppliers, and Admins
+- **RFP Lifecycle Management**: Draft → Published → Closed → Awarded
+- **Response Management**: Draft → Submitted → Under Review → Approved/Rejected → Awarded
+- **Document Management**: File uploads with soft delete capability
+- **Audit Trail**: Complete logging of all user actions
+- **Real-time Notifications**: WebSocket-based notifications with email integration
+
 ## Database Design
 ![alt text](database_design.png)
 
@@ -51,19 +62,19 @@ Represents a user of the application.
 | Field               | Type                | Description                                                 |
 |---------------------|---------------------|-------------------------------------------------------------|
 | `id`                | `String`            | Unique identifier for the user (UUID).                      |
-| `name`              | `String`            | The user's full name.                                       |
+| `name`              | `String`            | The user's full name. Default: "User"                       |
 | `email`             | `String`            | The user's email address. Must be unique.                   |
 | `password_hash`     | `String`            | The user's hashed password.                                 |
 | `role_id`           | `String`            | Foreign key for the user's role.                            |
 | `role`              | `Role`              | The role assigned to the user.                              |
-| `status`            | `String`            | User status ('active' or 'inactive').                       |
+| `status`            | `String`            | User status ('active' or 'inactive'). Default: 'active'     |
 | `created_at`        | `DateTime`          | Timestamp of when the user was created.                     |
 | `updated_at`        | `DateTime`          | Timestamp of when the user was last updated.                |
-| `rfps`              | `RFP[]`             | A list of RFPs created by the user (if Buyer).              |
-| `supplier_responses`| `SupplierResponse[]` | A list of responses submitted by the user (if Supplier).   |
-| `documents`         | `Document[]`        | A list of documents uploaded by the user.                   |
-| `audit_trails`      | `AuditTrail[]`      | A list of audit trail entries related to the user's actions.|
-| `notifications`     | `Notification[]`    | Notifications for this user.                                |
+| `rfps`              | `RFP[]`             | RFPs created by this user (Buyer role).                     |
+| `supplier_responses`| `SupplierResponse[]` | Responses submitted by this user (Supplier role).           |
+| `documents`         | `Document[]`        | Documents uploaded by this user.                            |
+| `audit_trails`      | `AuditTrail[]`      | Audit trail entries for this user's actions.                |
+| `notifications`     | `Notification[]`    | Notifications sent to this user.                            |
 
 ---
 
@@ -94,7 +105,7 @@ Represents a user of the application.
 
 ### `RFP`
 
-Represents a Request for Proposal.
+Represents a Request for Proposal with versioning and soft delete support.
 
 | Field               | Type                  | Description                                                 |
 |---------------------|-----------------------|-------------------------------------------------------------|
@@ -103,17 +114,24 @@ Represents a Request for Proposal.
 | `status_id`         | `String`              | Foreign key for the status.                                 |
 | `status`            | `RFPStatus`           | The current status of the RFP.                              |
 | `buyer_id`          | `String`              | Foreign key for the buyer.                                  |
-| `buyer`             | `User`                | The buyer (User) who created the RFP.                       |
-| `created_at`        | `DateTime`            | Timestamp of when the RFP was created.                      |
-| `updated_at`        | `DateTime`            | Timestamp of when the RFP was last updated.                 |
-| `closed_at`         | `DateTime?`           | Timestamp of when the RFP was closed.                       |
-| `awarded_at`        | `DateTime?`           | Timestamp of when the RFP was awarded.                      |
-| `awarded_response_id`| `String?`            | Foreign key for the awarded response.                       |
-| `awarded_response`  | `SupplierResponse?`   | The response that was awarded.                              |
-| `current_version_id`| `String?`            | Foreign key for the current version.                        |
-| `current_version`   | `RFPVersion?`        | The current version of this RFP.                            |
-| `versions`          | `RFPVersion[]`        | A list of versions of this RFP.                             |
-| `supplier_responses`| `SupplierResponse[]`  | Responses submitted for this RFP.                           |
+| `buyer`             | `User`                | The buyer who created the RFP.                              |
+| `awarded_response_id`| `String?`            | Foreign key for the awarded response (unique).              |
+| `awarded_response`  | `SupplierResponse?`   | The winning response (reverse relation).                    |
+| `current_version_id`| `String?`            | Foreign key for the current version (unique).               |
+| `current_version`   | `RFPVersion?`        | The current active version of this RFP.                     |
+| `created_at`        | `DateTime`           | Timestamp of when the RFP was created.                      |
+| `updated_at`        | `DateTime`           | Timestamp of when the RFP was last updated.                 |
+| `deleted_at`        | `DateTime?`          | Soft delete timestamp (null = active).                      |
+| `closed_at`         | `DateTime?`          | Timestamp when RFP was closed.                              |
+| `awarded_at`        | `DateTime?`          | Timestamp when RFP was awarded.                             |
+| `versions`          | `RFPVersion[]`       | All versions of this RFP.                                   |
+| `supplier_responses`| `SupplierResponse[]` | Responses submitted for this RFP.                           |
+
+**Key Features:**
+- **Soft Delete**: `deleted_at` field enables safe deletion without data loss
+- **Versioning**: Each RFP can have multiple versions with `current_version` tracking
+- **Award Management**: Tracks winning response and award timestamp
+- **Lifecycle Tracking**: Complete timestamp tracking from creation to award
 
 ---
 
@@ -140,25 +158,28 @@ Represents a specific version of an RFP.
 
 ### `Document`
 
-Represents a file uploaded to the system.
+Represents a file uploaded to the system with soft delete support.
 
 | Field               | Type                | Description                                                 |
 |---------------------|---------------------|-------------------------------------------------------------|
 | `id`                | `String`            | Unique identifier for the document (UUID).                  |
-| `file_name`         | `String`            | The name of the file.                                       |
-| `url`         | `String`            | The path where the file is stored.                          |
-| `file_type`         | `String?`           | The MIME type of the file.                                  |
-| `version`           | `Int`               | Version number of the document.                             |
-| `created_at`        | `DateTime`          | Timestamp when uploaded.                                    |
-| `uploader_id`       | `String`            | Foreign key for the uploader.                               |
+| `file_name`         | `String`            | The name of the uploaded file.                              |
+| `url`               | `String`            | Cloudinary URL where the file is stored.                    |
+| `file_type`         | `String?`           | MIME type of the file (pdf, image, docx, etc.).             |
+| `created_at`        | `DateTime`          | Timestamp when the document was uploaded.                   |
+| `deleted_at`        | `DateTime?`         | Soft delete timestamp (null = active).                      |
+| `uploader_id`       | `String`            | Foreign key for the user who uploaded the document.         |
 | `uploader`          | `User`              | The user who uploaded the document.                         |
-| `rfp_response_id`   | `String?`           | Foreign key for the supplier response.                      |
-| `rfp_response`      | `SupplierResponse?` | The supplier response this document is associated with.     |
-| `rfp_version_id`    | `String?`           | Foreign key for the RFP version.                            |
+| `rfp_response_id`   | `String?`           | Foreign key for supplier response (if attached to response).|
+| `rfp_response`      | `SupplierResponse?` | The supplier response this document belongs to.             |
+| `rfp_version_id`    | `String?`           | Foreign key for RFP version (if attached to RFP).           |
 | `rfp_version`       | `RFPVersion?`       | The RFP version this document is attached to.               |
-| `parent_document_id`| `String?`           | Foreign key for the parent document (for versioning).       |
-| `parent_document`   | `Document?`         | Parent document.                                            |
-| `versions`          | `Document[]`        | Different versions of this document.                        |
+
+**Key Features:**
+- **Soft Delete**: Documents can be marked as deleted without actual removal
+- **Dual Association**: Documents can be attached to either RFP versions or supplier responses
+- **Cloud Storage**: Files are stored in Cloudinary with URLs for access
+- **Type Tracking**: MIME types help with file handling and display
 
 ---
 
@@ -191,66 +212,110 @@ Represents a response from a supplier to an RFP.
 | `supplier_id`   | `String`                | Foreign key for the supplier.                               |
 | `supplier`      | `User`                  | The supplier who submitted the response.                    |
 | `status_id`     | `String`                | Foreign key for the status.                                 |
-| `status`        | `SupplierResponseStatus`| The status of the response.                                 |
-| `proposed_budget`| `Float?`               | Proposed budget (optional).                                 |
-| `timeline`      | `String?`               | Proposed timeline (optional).                               |
-| `cover_letter`  | `String?`               | Optional cover letter.                                      |
-| `rejection_reason` | `String?`            | Reason for rejection (if rejected).                        |
-| `documents`     | `Document[]`            | Documents attached to the response.                         |
-| `created_at`    | `DateTime`              | When the response was created.                              |
-| `updated_at`    | `DateTime`              | When the response was last updated.                         |
-| `submitted_at`  | `DateTime?`             | When the response was submitted.                            |
-| `reviewed_at`   | `DateTime?`             | When the response was reviewed.                             |
-| `decided_at`    | `DateTime?`             | When the response was awarded.                              |
-| `awarded_for_rfp` | `RFP?`               | Reverse relation for awarded response.                      |
+| `status`        | `SupplierResponseStatus`| The current status of the response.                         |
+| `proposed_budget`| `Float?`               | Proposed budget amount (optional).                          |
+| `timeline`      | `String?`               | Proposed timeline/delivery schedule (optional).             |
+| `cover_letter`  | `String?`               | Optional cover letter or proposal summary.                  |
+| `rejection_reason`| `String?`             | Reason for rejection (populated when rejected).             |
+| `documents`     | `Document[]`            | Documents attached to this response.                        |
+| `created_at`    | `DateTime`              | Timestamp when the response was first created.              |
+| `updated_at`    | `DateTime`              | Timestamp when the response was last updated.               |
+| `submitted_at`  | `DateTime?`             | Timestamp when draft was submitted for review.              |
+| `reviewed_at`   | `DateTime?`             | Timestamp when response was reviewed.                       |
+| `decided_at`    | `DateTime?`             | Timestamp when final decision was made (approved/rejected). |
+| `awarded_for_rfp`| `RFP?`                | Reverse relation for awarded response (only one per RFP).   |
+
+**Response Status Lifecycle:**
+- `Draft` → `Submitted` → `Under Review` → `Approved`/`Rejected`
+- `Approved` → `Awarded` (only one response per RFP can be awarded)
+- `Rejected` → `Draft` (can be reopened for editing)
+
+**Key Features:**
+- **Complete Audit Trail**: Timestamp tracking at every stage
+- **Flexible Content**: Optional budget, timeline, and cover letter
+- **Document Support**: Multiple documents can be attached
+- **Rejection Tracking**: Detailed rejection reasons for transparency
+- **Award Management**: Only one response per RFP can be awarded
 
 ---
 
 ### `AuditTrail`
 
-Logs actions performed by users in the system.
+Comprehensive audit trail for tracking all user actions and system events.
 
 | Field         | Type       | Description                                                 |
 |---------------|------------|-------------------------------------------------------------|
-| `id`          | `BigInt`   | Unique identifier (auto-increment).                         |
-| `user_id`     | `String?`  | Foreign key for the user.                                   |
-| `user`        | `User?`    | The user who performed the action.                          |
-| `action`      | `String`   | The action performed (e.g., login, create_rfp).             |
-| `target_type` | `String?`  | The type of object affected (e.g., RFP).                    |
+| `id`          | `String`   | Unique identifier (UUID).                                   |
+| `user_id`     | `String?`  | Foreign key for the user who performed the action.          |
+| `user`        | `User?`    | The user who performed the action (null for system actions).|
+| `action`      | `String`   | The action performed (e.g., RFP_CREATED, USER_LOGIN).       |
+| `target_type` | `String?`  | The type of object affected (e.g., RFP, SupplierResponse).  |
 | `target_id`   | `String?`  | ID of the affected object.                                  |
-| `details`     | `Json?`    | Additional details about the action.                        |
-| `created_at`  | `DateTime` | Timestamp of the action.                                    |
+| `details`     | `Json?`    | Additional details about the action in JSON format.         |
+| `created_at`  | `DateTime` | Timestamp when the action occurred.                         |
+
+**Audit Actions Tracked:**
+- **User Actions**: LOGIN, LOGOUT, USER_REGISTERED
+- **RFP Management**: RFP_CREATED, RFP_UPDATED, RFP_DELETED, RFP_PUBLISHED
+- **Response Management**: RESPONSE_CREATED, RESPONSE_SUBMITTED, RESPONSE_MOVED_TO_REVIEW, RESPONSE_APPROVED, RESPONSE_REJECTED, RESPONSE_REOPENED, RESPONSE_AWARDED
+- **Document Management**: DOCUMENT_UPLOADED, DOCUMENT_DELETED
+- **Admin Actions**: USER_CREATED, USER_UPDATED, USER_STATUS_CHANGED, PERMISSIONS_UPDATED, DATA_EXPORTED, REPORT_GENERATED
+
+**Key Features:**
+- **Complete Traceability**: Every CRUD operation is logged
+- **User Attribution**: Links actions to specific users
+- **Rich Details**: JSON field stores additional context
+- **System Actions**: Supports actions without user attribution
 
 ---
 
 ### `NotificationTemplate`
 
-Represents a template for notifications.
+Predefined templates for system notifications with placeholder support.
 
-| Field        | Type         | Description                                                 |
-|--------------|--------------|-------------------------------------------------------------|
-| `id`         | `String`     | Unique identifier (UUID).                                   |
-| `code`       | `String`     | Unique code (e.g., RFP_PUBLISHED).                         |
-| `title`      | `String`     | Notification title.                                         |
-| `message`    | `String`     | Message with placeholders (e.g., {{rfp_title}}).            |
-| `channel`    | `String`     | Delivery channel (EMAIL, IN_APP, BOTH).                     |
-| `created_at` | `DateTime`   | When the template was created.                              |
-| `notifications`| `Notification[]` | Notifications using this template.                   |
+| Field        | Type            | Description                                                 |
+|--------------|-----------------|-------------------------------------------------------------|
+| `id`         | `String`        | Unique identifier (UUID).                                   |
+| `code`       | `String`        | Unique template code (primary key).                         |
+| `title`      | `String`        | Notification title template.                                |
+| `message`    | `String`        | Message template with placeholders (e.g., {{rfp_title}}).   |
+| `channel`    | `String`        | Delivery channel: 'EMAIL', 'IN_APP', or 'BOTH'.             |
+| `created_at` | `DateTime`      | When the template was created.                              |
+| `notifications`| `Notification[]`| All notifications using this template.                      |
+
+**Available Notification Templates:**
+- `USER_CREATED`: New user registration notification
+- `RFP_CREATED`: RFP creation notification for admins
+- `RFP_PUBLISHED`: RFP publishing notification for suppliers
+- `RESPONSE_DRAFT_CREATED`: Draft response creation notification for admins
+- `RESPONSE_SUBMITTED`: Response submission notification for buyers
+- `RESPONSE_MOVED_TO_REVIEW`: Response moved to review notification
+- `RESPONSE_APPROVED`: Response approval notification
+- `RESPONSE_REJECTED`: Response rejection notification
+- `RESPONSE_REOPENED`: Response reopened for editing notification
+- `RESPONSE_AWARDED`: Response awarded notification
 
 ---
 
 ### `Notification`
 
-Represents an actual notification sent to a user.
+Individual notification instances sent to users.
 
 | Field         | Type                   | Description                                                 |
 |---------------|------------------------|-------------------------------------------------------------|
 | `id`          | `String`               | Unique identifier (UUID).                                   |
-| `user_id`     | `String`               | Foreign key for the user.                                   |
+| `user_id`     | `String`               | Foreign key for the recipient user.                         |
 | `user`        | `User`                 | The user receiving the notification.                        |
-| `template_code`| `String`              | Foreign key for the template code.                          |
-| `template`    | `NotificationTemplate` | The notification template.                                  |
-| `data`        | `Json?`                | Runtime values to replace placeholders.                     |
-| `is_read`     | `Boolean`              | Whether the notification has been read.                     |
+| `template_code`| `String`              | Foreign key referencing the notification template.          |
+| `template`    | `NotificationTemplate` | The notification template used.                             |
+| `data`        | `Json?`                | Runtime data to replace template placeholders.              |
+| `is_read`     | `Boolean`              | Whether the user has read the notification. Default: false |
 | `created_at`  | `DateTime`             | When the notification was created.                          |
-| `sent_at`     | `DateTime?`            | When the notification was sent (optional).                  |
+| `sent_at`     | `DateTime?`            | When the notification was sent/delivered.                   |
+
+**Notification System Features:**
+- **Template-based**: Reusable templates with dynamic content
+- **Multi-channel**: Support for in-app, email, or both
+- **Read Tracking**: Users can mark notifications as read
+- **Real-time Delivery**: WebSocket integration for instant notifications
+- **Bulk Operations**: Mark all notifications as read functionality

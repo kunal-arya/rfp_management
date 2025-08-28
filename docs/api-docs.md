@@ -354,6 +354,54 @@ Award a response (buyers only).
 
 Move response to review status (buyers only).
 
+#### `PUT /rfp/responses/:responseId/reopen`
+
+Reopen a rejected response for editing (buyers and admins).
+
+**Required Permission:** `supplier_response.reopen`
+
+**Authorization:** Buyer (for their own RFPs) or Admin (for any response)
+
+**Request Body:** None
+
+**Response:**
+```json
+{
+  "id": "response-uuid",
+  "rfp_id": "rfp-uuid",
+  "supplier_id": "supplier-uuid",
+  "status": {
+    "code": "Draft",
+    "label": "Draft"
+  },
+  "proposed_budget": 50000,
+  "timeline": "3 months",
+  "cover_letter": "Updated proposal...",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z",
+  "supplier": {
+    "id": "supplier-uuid",
+    "name": "John Supplier",
+    "email": "john@supplier.com"
+  },
+  "rfp": {
+    "id": "rfp-uuid",
+    "title": "Software Development RFP",
+    "buyer": {
+      "name": "Jane Buyer",
+      "email": "jane@buyer.com"
+    }
+  }
+}
+```
+
+**Notifications Sent:**
+- Database notification to supplier
+- Real-time WebSocket notification to supplier
+- Email notification to supplier
+- Database notification to all admins
+- Real-time WebSocket notification to all admins
+
 ### Documents
 
 #### `POST /rfp/documents`
@@ -750,8 +798,123 @@ Get comprehensive analytics data (admin only).
   ```
 - `401 Unauthorized`: Invalid or missing token
 - `403 Forbidden`: Insufficient permissions
+
+#### `GET /admin/roles`
+
+Get all roles with their permissions (admin only).
+
+**Required Permission:** `admin.manage_roles`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+
+**Responses:**
+- `200 OK`: Roles retrieved successfully
+  ```json
+  {
+    "roles": [
+      {
+        "id": "role-uuid",
+        "name": "Buyer",
+        "description": "Can create and manage RFPs",
+        "permissions": {
+          "rfp": {
+            "create": { "allowed": true },
+            "update": { "allowed": true, "scope": "own" },
+            "delete": { "allowed": true, "scope": "own" },
+            "view": { "allowed": true }
+          },
+          "supplier_response": {
+            "view": { "allowed": true, "scope": "rfp_owner" },
+            "approve": { "allowed": true, "scope": "rfp_owner" },
+            "reject": { "allowed": true, "scope": "rfp_owner" }
+          }
+        }
+      }
+    ]
+  }
+  ```
+- `401 Unauthorized`: Invalid or missing token
+- `403 Forbidden`: Insufficient permissions
+
+#### `GET /admin/roles/:roleName/permissions`
+
+Get permissions for a specific role (admin only).
+
+**Required Permission:** `admin.manage_roles`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+
+**Parameters:**
+- `roleName`: Role name (Buyer, Supplier, Admin)
+
+**Responses:**
+- `200 OK`: Role permissions retrieved successfully
+  ```json
+  {
+    "roleName": "Buyer",
+    "permissions": {
+      "rfp": {
+        "create": { "allowed": true },
+        "update": { "allowed": true, "scope": "own" }
+      }
+    }
+  }
+  ```
+- `401 Unauthorized`: Invalid or missing token
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Role not found
+
+#### `PUT /admin/roles/:roleName/permissions`
+
+Update permissions for a specific role (admin only).
+
+**Required Permission:** `admin.manage_roles`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+
+**Parameters:**
+- `roleName`: Role name (Buyer, Supplier, Admin)
+
+**Request Body:**
+```json
+{
+  "permissions": {
+    "rfp": {
+      "create": { "allowed": true },
+      "update": { "allowed": true, "scope": "own" }
+    },
+    "supplier_response": {
+      "view": { "allowed": true, "scope": "rfp_owner" }
+    }
+  }
 }
 ```
+
+**Responses:**
+- `200 OK`: Permissions updated successfully
+  ```json
+  {
+    "message": "Role permissions updated successfully",
+    "roleName": "Buyer",
+    "permissions": {
+      "rfp": {
+        "create": { "allowed": true }
+      }
+    }
+  }
+  ```
+- `400 Bad Request`: Invalid permissions structure
+- `401 Unauthorized`: Invalid or missing token
+- `403 Forbidden`: Insufficient permissions
+- `404 Not Found`: Role not found
+
+**Notifications Sent:**
+- Database notification to all admin users
+- Real-time WebSocket notification to all admin users
+- Email notification to all admin users
 
 #### `POST /admin/reports/schedule`
 
