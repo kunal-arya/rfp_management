@@ -14,6 +14,7 @@ const WebSocketContext = createContext<WebSocketContextType>({
   isConnected: false,
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWebSocket = () => useContext(WebSocketContext);
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -135,17 +136,35 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       newSocket.on('response_rejected', (notification) => {
         const data = notification.data;
-        
+
         // Invalidate dashboard queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
         queryClient.invalidateQueries({ queryKey: ['responses'] });
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        
+
         toast.error(`Response Rejected: ${data.rfp?.title || 'RFP'}`, {
           description: `Your response has been rejected. Check the details for more information.`,
           action: {
             label: 'View Response',
+            onClick: () => (window.location.href = `/responses/${data.id}`),
+          },
+        });
+      });
+
+      newSocket.on('response_reopened', (notification) => {
+        const data = notification.data;
+
+        // Invalidate dashboard queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['responses'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+
+        toast.info(`Response Reopened: ${data.rfp?.title || 'RFP'}`, {
+          description: `Your response has been reopened for editing. You can now make changes.`,
+          action: {
+            label: 'Edit Response',
             onClick: () => (window.location.href = `/responses/${data.id}`),
           },
         });
@@ -226,12 +245,28 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
         queryClient.invalidateQueries({ queryKey: ['responses'] });
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        
+
         toast.info(`New Response Created`, {
           description: 'A new response has been created.',
           action: {
             label: 'View',
             onClick: () => (window.location.href = `/responses/${data.id}`),
+          },
+        });
+      });
+
+      newSocket.on('response_draft_created', (notification) => {
+        const data = notification.data;
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['responses'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+
+        toast.info(`New Response Draft Created: ${data.rfp_title}`, {
+          description: `A new response draft has been created by ${data.supplier_name}`,
+          action: {
+            label: 'View',
+            onClick: () => (window.location.href = `/responses/${data.response_id}`),
           },
         });
       });
@@ -288,21 +323,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           action: {
             label: 'View Users',
             onClick: () => (window.location.href = '/admin/users'),
-          },
-        });
-      });
-
-      newSocket.on('data_export', (notification) => {
-        const data = notification.data;
-        
-        // Invalidate admin queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        
-        toast.success(`Data Export Completed: ${data.filename}`, {
-          description: `Export completed with ${data.recordCount} records.`,
-          action: {
-            label: 'View Exports',
-            onClick: () => (window.location.href = '/admin/reports'),
           },
         });
       });

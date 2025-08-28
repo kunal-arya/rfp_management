@@ -206,6 +206,38 @@ export const sendResponseAwardedNotification = async (responseId: string) => {
     }
 };
 
+export const sendResponseReopenedNotification = async (responseId: string) => {
+    try {
+        const response = await prisma.supplierResponse.findUnique({
+            where: { id: responseId },
+            include: {
+                supplier: true,
+                rfp: {
+                    include: {
+                        current_version: true,
+                        buyer: true,
+                    },
+                },
+            },
+        });
+
+        if (!response) {
+            throw new Error('Response not found');
+        }
+
+        const emailData: EmailData = {
+            to: response.supplier.email,
+            subject: `📝 Response Reopened for Editing: ${response.rfp.title}`,
+            html: EMAIL_TEMPLATES.responseReopened(response),
+        };
+
+        return await sendEmail(emailData);
+    } catch (error) {
+        console.error('Response reopened notification failed:', error);
+        return { success: false, message: 'Notification failed' };
+    }
+};
+
 export const sendResponseSubmittedNotification = async (responseId: string) => {
     try {
         const response = await prisma.supplierResponse.findUnique({

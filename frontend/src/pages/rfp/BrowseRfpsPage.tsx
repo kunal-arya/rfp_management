@@ -99,7 +99,7 @@ export const BrowseRfpsPage: React.FC = () => {
     { value: 'Awarded', label: 'Awarded' },
   ];
 
-  if (user?.role !== "admin") {
+  if (user?.role === "Buyer") {
     return <Navigate to="/dashboard" />;
   }
 

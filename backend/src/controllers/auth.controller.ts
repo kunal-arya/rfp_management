@@ -3,6 +3,8 @@ import * as authService from '../services/auth.service';
 import { registerSchema, loginSchema } from '../validations/auth.validation';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { notifyUserCreated } from '../services/websocket.service';
+import { notificationService } from '../services/notification.service';
+import { RoleName } from '../utils/enum';
 
 export const register = async (req: Request, res: Response) => {
     const validationResult = registerSchema.safeParse(req.body);
@@ -18,6 +20,14 @@ export const register = async (req: Request, res: Response) => {
         
         // Send notification to admin users about new user registration
         notifyUserCreated(user.user);
+
+        // Create database notifications for all admin users
+        await notificationService.createNotificationForRole(RoleName.Admin, 'USER_CREATED', {
+            email: user.user.email,
+            name: user.user.name,
+            role_name: user.user.role || roleName,
+            user_id: user.user.id
+        });
         
         res.status(201).json(user);
     } catch (error: any) {
@@ -65,6 +75,18 @@ export const createAdmin = async (req: Request, res: Response) => {
 
     try {
         const user = await authService.createAdminUser(name, email, password);
+
+        // Send notification to admin users about new admin user creation
+        notifyUserCreated(user.user);
+
+        // Create database notifications for all admin users
+        await notificationService.createNotificationForRole(RoleName.Admin, 'USER_CREATED', {
+            email: user.user.email,
+            name: user.user.name,
+            role_name: user.user.role || 'Admin',
+            user_id: user.user.id
+        });
+
         res.status(201).json(user);
     } catch (error: any) {
         if (error.message === 'Email already exists') {

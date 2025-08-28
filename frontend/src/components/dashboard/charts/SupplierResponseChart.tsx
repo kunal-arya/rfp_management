@@ -39,7 +39,7 @@ export const SupplierResponseChart: React.FC<SupplierResponseChartProps> = ({ st
       value: stats.awardedResponses || 0,
       color: '#8B5CF6',
     },
-  ].filter(item => item.value > 0); // Only show statuses with responses
+  ]
 
   if (chartData.length === 0) {
     return (

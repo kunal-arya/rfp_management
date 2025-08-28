@@ -55,18 +55,17 @@ export const getIO = () => {
 };
 
 // Notification functions
-export const notifyRfpPublished = (rfpData: any) => {
+export const notifyRfpPublished = (rfpData: any, excludeBuyerId?: string) => {
     const io = getIO();
+
+    // Send to all suppliers
     io.to('Supplier').emit('rfp_published', {
         type: 'RFP_PUBLISHED',
         data: rfpData,
         timestamp: new Date().toISOString()
     });
-    io.to('Buyer').emit('rfp_published', {
-        type: 'RFP_PUBLISHED',
-        data: rfpData,
-        timestamp: new Date().toISOString()
-    });
+
+    // Send to all admins
     io.to('Admin').emit('rfp_published', {
         type: 'RFP_PUBLISHED',
         data: rfpData,
@@ -162,9 +161,25 @@ export const notifyResponseAwarded = (responseData: any, supplierId: string) => 
         timestamp: new Date().toISOString()
     });
 
-    // Also notify admin users  
+    // Also notify admin users
     io.to('Admin').emit('response_awarded', {
         type: 'RESPONSE_AWARDED',
+        data: responseData,
+        timestamp: new Date().toISOString()
+    });
+};
+
+export const notifyResponseReopened = (responseData: any, supplierId: string) => {
+    const io = getIO();
+    io.to(`user_${supplierId}`).emit('response_reopened', {
+        type: 'RESPONSE_REOPENED',
+        data: responseData,
+        timestamp: new Date().toISOString()
+    });
+
+    // Also notify admin users
+    io.to('Admin').emit('response_reopened', {
+        type: 'RESPONSE_REOPENED',
         data: responseData,
         timestamp: new Date().toISOString()
     });
@@ -272,6 +287,15 @@ export const notifyUserCreated = (userData: any) => {
     io.to('Admin').emit('user_created', {
         type: 'USER_CREATED',
         data: userData,
+        timestamp: new Date().toISOString()
+    });
+};
+
+export const notifyAdmins = (event: string, data: any) => {
+    const io = getIO();
+    io.to('Admin').emit(event, {
+        type: event.toUpperCase(),
+        data: data,
         timestamp: new Date().toISOString()
     });
 };

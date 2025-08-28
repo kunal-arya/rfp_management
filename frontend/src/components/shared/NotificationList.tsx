@@ -49,14 +49,22 @@ export const NotificationList: React.FC<NotificationListProps> = ({ onClose }) =
 
   const getNotificationIcon = (templateCode: string) => {
     switch (templateCode) {
+      case 'RFP_CREATED':
+        return '📋';
       case 'RFP_PUBLISHED':
         return '📢';
+      case 'RESPONSE_DRAFT_CREATED':
+        return '📝';
       case 'RESPONSE_SUBMITTED':
+        return '📝';
+      case 'RESPONSE_REOPENED':
         return '📝';
       case 'RFP_STATUS_CHANGED':
         return '🔄';
       case 'DEADLINE_APPROACHING':
         return '⏰';
+      case 'USER_CREATED':
+        return '👤';
       default:
         return '🔔';
     }
@@ -70,12 +78,29 @@ export const NotificationList: React.FC<NotificationListProps> = ({ onClose }) =
 
     // Navigate based on notification type
     switch (notification.template_code) {
+      case 'RFP_CREATED':
+        if (notification.data?.rfp_id) {
+          window.location.href = `/rfps/${notification.data.rfp_id}`;
+        } else {
+          window.location.href = '/admin/rfps';
+        }
+        break;
       case 'RFP_PUBLISHED':
         if (notification.data?.rfp_id) {
           window.location.href = `/rfps/${notification.data.rfp_id}`;
         }
         break;
+      case 'RESPONSE_DRAFT_CREATED':
+        if (notification.data?.response_id) {
+          window.location.href = `/responses/${notification.data.response_id}`;
+        }
+        break;
       case 'RESPONSE_SUBMITTED':
+        if (notification.data?.response_id) {
+          window.location.href = `/responses/${notification.data.response_id}`;
+        }
+        break;
+      case 'RESPONSE_REOPENED':
         if (notification.data?.response_id) {
           window.location.href = `/responses/${notification.data.response_id}`;
         }
@@ -84,6 +109,10 @@ export const NotificationList: React.FC<NotificationListProps> = ({ onClose }) =
         if (notification.data?.rfp_id) {
           window.location.href = `/rfps/${notification.data.rfp_id}`;
         }
+        break;
+      case 'USER_CREATED':
+        // Navigate to admin users page
+        window.location.href = '/admin/users';
         break;
     }
 

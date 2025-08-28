@@ -190,8 +190,6 @@ export const getAnalyticsData = async () => {
         const matchingLogout = logoutEvents.find(logout => 
           logout.user_id === login.user_id && logout.created_at > login.created_at
         );
-
-        console.log({matchingLogout,logoutEvents});
         
         if (matchingLogout) {
           sessions.push(matchingLogout.created_at.getTime() - login.created_at.getTime());

@@ -146,7 +146,7 @@ export const EMAIL_TEMPLATES = {
             <p>Log in to your dashboard to view the complete RFP details and submit your proposal.</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/rfps/${rfp.id}" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/rfps/${rfp.id}" style="color: white !important" class="button">
             View RFP Details
         </a>
 
@@ -180,7 +180,7 @@ export const EMAIL_TEMPLATES = {
             <p>Please review this response and take appropriate action (approve, reject, or request changes).</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" style="color: white !important" class="button">
             Review Response
         </a>
 
@@ -214,7 +214,7 @@ export const EMAIL_TEMPLATES = {
             <p>The buyer is now evaluating your proposal. You will be notified once a decision has been made.</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" style="color: white !important" class="button">
             View Response
         </a>
 
@@ -247,7 +247,7 @@ export const EMAIL_TEMPLATES = {
             <p>Your proposal has been approved and is now being considered for the final award decision.</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" style="color: white !important" class="button">
             View Response
         </a>
 
@@ -281,7 +281,7 @@ export const EMAIL_TEMPLATES = {
             <p>Don't be discouraged. Continue to browse other RFPs and submit new proposals.</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/rfps/browse" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/rfps/browse" style="color: white !important" class="button">
             Browse More RFPs
         </a>
 
@@ -314,7 +314,7 @@ export const EMAIL_TEMPLATES = {
             <p>The buyer will contact you soon to discuss the next steps for project execution.</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" style="color: white !important" class="button">
             View Award Details
         </a>
 
@@ -345,7 +345,7 @@ export const EMAIL_TEMPLATES = {
             <p>Thank you for your participation in this RFP process.</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/rfps/${rfp.id}" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/rfps/${rfp.id}" style="color: white !important" class="button">
             View RFP Details
         </a>
 
@@ -354,6 +354,39 @@ export const EMAIL_TEMPLATES = {
         </p>
     `;
     return EMAIL_TEMPLATES.baseTemplate(content, `RFP Awarded: ${rfp.title}`);
+  },
+
+  responseReopened: (response: any) => {
+    const content = `
+        <h2 style="color: #495057; margin-bottom: 20px;">📝 Response Reopened for Editing</h2>
+
+        <div class="info-box">
+            <p><strong>Your response has been reopened for editing by the buyer.</strong></p>
+        </div>
+
+        <div class="rfp-details">
+            <h3>📋 Response Details</h3>
+            <p><strong>RFP Title:</strong> ${response.rfp.title}</p>
+            <p><strong>Your Email:</strong> ${response.supplier.email}</p>
+            <p><strong>Proposed Budget:</strong> $${response.proposed_budget?.toLocaleString() || 'N/A'}</p>
+            <p><strong>Timeline:</strong> ${response.timeline || 'N/A'}</p>
+            <p><strong>Status:</strong> <span style="color: #2196f3; font-weight: bold;">Reopened for Editing</span></p>
+        </div>
+
+        <div class="highlight">
+            <p><strong>🎯 What You Can Do Now</strong></p>
+            <p>You can now edit your response and resubmit it for review. Make sure to address any previous feedback.</p>
+        </div>
+
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/responses/${response.id}" style="color: white !important" class="button">
+            Edit Your Response
+        </a>
+
+        <p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+            Take advantage of this opportunity to improve your response. Good luck!
+        </p>
+    `;
+    return EMAIL_TEMPLATES.baseTemplate(content, `Response Reopened: ${response.rfp.title}`);
   },
 
   // User Registration Welcome
@@ -377,7 +410,7 @@ export const EMAIL_TEMPLATES = {
             <p>Log in to your account and start exploring the platform!</p>
         </div>
 
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" class="button">
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="color: white !important" class="button">
             Log In to Your Account
         </a>
 

@@ -396,7 +396,7 @@ export const approveResponse = async (req: AuthenticatedRequest, res: Response) 
     }
 
     try {
-        const updatedResponse = await rfpService.approveResponse(response_id, user.userId);
+        const updatedResponse = await rfpService.approveResponse(response_id, user);
         res.json(updatedResponse);
     } catch (error: any) {
         if (error.message === 'Response not found') {

@@ -2,9 +2,9 @@ import { PrismaClient, User } from '@prisma/client';
 import { CreateRfpData, SubmitResponseData } from '../validations/rfp.validation';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { RFP_STATUS, RoleName, SUPPLIER_RESPONSE_STATUS, USER_STATUS } from '../utils/enum';
-import { sendRfpPublishedNotification, sendResponseSubmittedNotification, sendRfpStatusChangeNotification, sendResponseMovedToReviewNotification, sendResponseApprovedNotification, sendResponseRejectedNotification, sendResponseAwardedNotification } from './email.service';
+import { sendRfpPublishedNotification, sendResponseSubmittedNotification, sendRfpStatusChangeNotification, sendResponseMovedToReviewNotification, sendResponseApprovedNotification, sendResponseRejectedNotification, sendResponseAwardedNotification, sendResponseReopenedNotification } from './email.service';
 import { notificationService } from './notification.service';
-import { notifyRfpPublished, notifyResponseSubmitted, notifyRfpStatusChanged, notifyRfpCreated, notifyRfpUpdated, notifyRfpDeleted, notifyResponseMovedToReview, notifyResponseApproved, notifyResponseRejected, notifyResponseAwarded, notifyRfpAwarded } from './websocket.service';
+import { notifyRfpPublished, notifyResponseSubmitted, notifyRfpStatusChanged, notifyRfpCreated, notifyRfpUpdated, notifyRfpDeleted, notifyResponseMovedToReview, notifyResponseApproved, notifyResponseRejected, notifyResponseAwarded, notifyRfpAwarded, notifyResponseCreated, notifyResponseReopened, notifyAdmins } from './websocket.service';
 import { createAuditEntry } from './audit.service';
 import { AUDIT_ACTIONS } from '../utils/enum';
 
@@ -70,10 +70,16 @@ export const createRfp = async (rFPData: CreateRfpData, user: any) => {
             status: updateRfp.status.code,
         });
 
-        // Send real-time notification to buyer
-        if (user.role === RoleName.Admin) {
-            notifyRfpCreated(updateRfp);
-        }
+        // Send real-time notification to admins
+        notifyRfpCreated(updateRfp);
+
+        // Create database notifications for all admin users
+        await notificationService.createNotificationForRole('Admin', 'RFP_CREATED', {
+            rfp_title: updateRfp.title,
+            buyer_name: updateRfp.buyer.email,
+            rfp_id: updateRfp.id,
+            status: updateRfp.status.code
+        });
     }
 
     return updateRfp;
@@ -588,8 +594,8 @@ export const publishRfp = async (rFPId: string, userId: string) => {
             rfp_id: rfpWithDetails.id
         }, userId); // Pass buyer ID to exclude from supplier notifications
 
-        // Send real-time notification to all suppliers and buyer
-        notifyRfpPublished(rfpWithDetails);
+        // Send real-time notification to suppliers and admins (excluding the buyer who published)
+        notifyRfpPublished(rfpWithDetails, userId);
 
         // Create audit trail entry
         await createAuditEntry(userId, AUDIT_ACTIONS.RFP_PUBLISHED, 'RFP', rFPId, {
@@ -1078,6 +1084,25 @@ export const createDraftResponse = async (rFPId: string, responseData: SubmitRes
         status: response.status.code,
     });
 
+    // Send notifications only when supplier creates draft (not admin)
+    if (userRole !== 'Admin') {
+        // Create notification for all admins (buyer cannot see draft responses)
+        await notificationService.createNotificationForRole('Admin', 'RESPONSE_DRAFT_CREATED', {
+            rfp_title: response.rfp.title,
+            supplier_name: response.supplier.email,
+            buyer_name: response.rfp.buyer.email,
+            response_id: response.id
+        });
+
+        // Send real-time notification to admins only
+        notifyAdmins('response_draft_created', {
+            rfp_title: response.rfp.title,
+            supplier_name: response.supplier.email,
+            buyer_name: response.rfp.buyer.email,
+            response_id: response.id
+        });
+    }
+
     return response;
 };
 
@@ -1233,7 +1258,88 @@ export const moveResponseToReview = async (responseId: string, buyerId: string) 
     return updatedResponse;
 };
 
-export const approveResponse = async (responseId: string, buyerId: string) => {
+export const approveResponse = async (responseId: string, user: any) => {
+    const buyerId = user.userId;
+    const userRole = user.role;
+
+    const response = await prisma.supplierResponse.findUnique({
+        where: { id: responseId },
+        include: {
+            status: true,
+            supplier: true,
+            rfp: {
+                include: {
+                    buyer: true,
+                    current_version: true,
+                    status: true,
+                },
+            },
+        },
+    });
+
+    if (!response) {
+        throw new Error('Response not found');
+    }
+
+    if (response.status.code !== SUPPLIER_RESPONSE_STATUS.Under_Review) {
+        throw new Error('Response cannot be approved in current status');
+    }
+
+    const approvedStatus = await prisma.supplierResponseStatus.findUnique({
+        where: { code: SUPPLIER_RESPONSE_STATUS.Approved },
+    });
+
+    if (!approvedStatus) {
+        throw new Error('Approved status not found');
+    }
+
+    const updatedResponse = await prisma.supplierResponse.update({
+        where: { id: responseId },
+        data: {
+            status_id: approvedStatus.id,
+            decided_at: new Date(),
+        },
+        include: {
+            status: true,
+            supplier: true,
+            rfp: {
+                include: {
+                    buyer: true,
+                    current_version: true,
+                    status: true,
+                },
+            },
+        },
+    });
+
+    // Create audit trail entry
+    await createAuditEntry(buyerId, AUDIT_ACTIONS.RESPONSE_APPROVED, 'SupplierResponse', responseId, {
+        rfp_id: response.rfp_id,
+        rfp_title: response.rfp.title,
+        previous_status: 'Under Review',
+        new_status: 'Approved',
+    });
+
+    // Send real-time notification to the supplier
+    notifyResponseApproved(updatedResponse, updatedResponse.supplier_id);
+
+    // Send email notification to supplier
+    await sendResponseApprovedNotification(responseId);
+
+    // Create notification for the supplier (excluding the buyer who approved it)
+    await notificationService.createNotificationForUser(updatedResponse.supplier_id, AUDIT_ACTIONS.RESPONSE_APPROVED, {
+        rfp_title: updatedResponse.rfp.title,
+        supplier_name: updatedResponse.supplier.email,
+        response_id: updatedResponse.id
+    }, buyerId); // Pass buyer ID to exclude from supplier notification
+
+    await notificationService.createNotificationForRole('Admin', AUDIT_ACTIONS.RESPONSE_APPROVED, {
+        rfp_title: updatedResponse.rfp.title,
+        supplier_name: updatedResponse.supplier.email,
+        response_id: updatedResponse.id
+    },buyerId);
+
+    return updatedResponse;
 };
 
 export const rejectResponse = async (responseId: string, rejectionReason: string, buyerId: string) => {
@@ -1317,7 +1423,9 @@ export const rejectResponse = async (responseId: string, rejectionReason: string
     return updatedResponse;
 };
 
-export const reopenResponseForEdit = async (responseId: string, buyerId: string) => {
+export const reopenResponseForEdit = async (responseId: string, user: any) => {
+    const buyerId = user.userId;
+    const userRole = user.role;
     const response = await prisma.supplierResponse.findUnique({
         where: { id: responseId },
         include: {
@@ -1342,21 +1450,11 @@ export const reopenResponseForEdit = async (responseId: string, buyerId: string)
 
     // Check if the user is authorized to reopen this response
     // Admin can reopen any response, buyer can only reopen responses to their RFPs
-    const user = await prisma.user.findUnique({
-        where: { id: buyerId },
-        include: { role: true }
-    });
-
-    if (!user) {
-        throw new Error('User not found');
-    }
-
-    // Admin can reopen any response
-    if (user.role.name === 'Admin') {
+    if (userRole === 'Admin') {
         // Admin is authorized
     }
     // Buyer can only reopen responses to their RFPs
-    else if (user.role.name === 'Buyer' && response.rfp.buyer_id === buyerId) {
+    else if (userRole === 'Buyer' && response.rfp.buyer_id === buyerId) {
         // Buyer is authorized
     }
     else {
@@ -1408,6 +1506,19 @@ export const reopenResponseForEdit = async (responseId: string, buyerId: string)
         supplier_id: response.supplier_id,
         supplier_email: response.supplier.email,
     });
+
+    // Send real-time notification to the supplier
+    notifyResponseReopened(updatedResponse, updatedResponse.supplier_id);
+
+    // Send email notification to supplier
+    await sendResponseReopenedNotification(responseId);
+
+    // Create notification for all admins
+    await notificationService.createNotificationForRole('Admin', 'RESPONSE_REOPENED', {
+        rfp_title: updatedResponse.rfp.title,
+        supplier_name: updatedResponse.supplier.email,
+        response_id: updatedResponse.id
+    }, buyerId);
 
     return updatedResponse;
 };

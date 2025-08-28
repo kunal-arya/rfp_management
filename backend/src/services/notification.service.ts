@@ -191,9 +191,27 @@ export const notificationService = {
     initializeDefaultTemplates: async () => {
         const templates = [
             {
+                code: 'USER_CREATED',
+                title: 'New User Registered',
+                message: 'A new user "{{name}}" has registered with email "{{email}}" and role "{{role_name}}".',
+                channel: 'BOTH'
+            },
+            {
+                code: 'RFP_CREATED',
+                title: 'New RFP Created',
+                message: 'A new RFP "{{rfp_title}}" has been created by {{buyer_name}} and is currently in {{status}} status.',
+                channel: 'BOTH'
+            },
+            {
                 code: 'RFP_PUBLISHED',
                 title: 'New RFP Published',
                 message: 'A new RFP "{{rfp_title}}" has been published by {{buyer_name}}. Deadline: {{deadline}}',
+                channel: 'BOTH'
+            },
+            {
+                code: 'RESPONSE_DRAFT_CREATED',
+                title: 'New Response Draft Created',
+                message: 'A new response draft has been created for RFP "{{rfp_title}}" by {{supplier_name}}',
                 channel: 'BOTH'
             },
             {
