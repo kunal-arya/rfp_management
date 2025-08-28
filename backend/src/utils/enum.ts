@@ -1,0 +1,80 @@
+export enum RoleName {
+    Buyer = "Buyer",
+    Supplier = "Supplier",
+    Admin = "Admin"
+}
+
+export enum RFP_STATUS {
+    Draft = "Draft",
+    Published = "Published",
+    Closed = "Closed",
+    Awarded = "Awarded",
+    Cancelled = "Cancelled"
+}
+
+export enum SUPPLIER_RESPONSE_STATUS {
+    Draft = "Draft",
+    Submitted = "Submitted",
+    Under_Review = "Under Review",
+    Approved = "Approved",
+    Rejected = "Rejected",
+    Awarded = "Awarded"
+}
+
+export enum USER_STATUS {
+    Active = "active",
+    Inactive = "inactive"
+}
+
+export enum AUDIT_ACTIONS {
+    // RFP Actions
+    RFP_CREATED = "RFP_CREATED",
+    RFP_UPDATED = "RFP_UPDATED",
+    RFP_DELETED = "RFP_DELETED",
+    RFP_PUBLISHED = "RFP_PUBLISHED",
+    RFP_STATUS_CHANGED = "RFP_STATUS_CHANGED",
+    
+    // Response Actions
+    RESPONSE_CREATED = "RESPONSE_CREATED",
+    RESPONSE_UPDATED = "RESPONSE_UPDATED",
+    RESPONSE_DELETED = "RESPONSE_DELETED",
+    RESPONSE_SUBMITTED = "RESPONSE_SUBMITTED",
+    RESPONSE_MOVED_TO_REVIEW = "RESPONSE_MOVED_TO_REVIEW",
+    RESPONSE_APPROVED = "RESPONSE_APPROVED",
+    RESPONSE_REJECTED = "RESPONSE_REJECTED",
+    RESPONSE_AWARDED = "RESPONSE_AWARDED",
+    RESPONSE_REOPENED = "RESPONSE_REOPENED",
+    
+    // Document Actions
+    DOCUMENT_UPLOADED = "DOCUMENT_UPLOADED",
+    DOCUMENT_DELETED = "DOCUMENT_DELETED",
+    
+    // User Actions
+    USER_LOGIN = "USER_LOGIN",
+    USER_LOGOUT = "USER_LOGOUT",
+    USER_REGISTERED = "USER_REGISTERED",
+    USER_PROFILE_UPDATED = "USER_PROFILE_UPDATED",
+    
+    // System Actions
+    SYSTEM_ERROR = "SYSTEM_ERROR",
+    PERMISSION_DENIED = "PERMISSION_DENIED",
+    
+    // Error Actions
+    AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR",
+    AUTHORIZATION_ERROR = "AUTHORIZATION_ERROR",
+    VALIDATION_ERROR = "VALIDATION_ERROR",
+    RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND",
+    CLIENT_ERROR = "CLIENT_ERROR",
+    
+    // Admin Actions
+    DATA_EXPORTED = "DATA_EXPORTED",
+    REPORT_GENERATED = "REPORT_GENERATED",
+    REPORT_SCHEDULED = "REPORT_SCHEDULED",
+    USER_CREATED = "USER_CREATED",
+    USER_UPDATED = "USER_UPDATED",
+    USER_STATUS_CHANGED = "USER_STATUS_CHANGED",
+    USER_DELETED = "USER_DELETED",
+    PERMISSIONS_UPDATED = "PERMISSIONS_UPDATED",
+    SYSTEM_CONFIG_UPDATED = "SYSTEM_CONFIG_UPDATED",
+    DATABASE_BACKUP_CREATED = "DATABASE_BACKUP_CREATED"
+}

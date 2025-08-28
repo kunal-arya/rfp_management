@@ -1,0 +1,184 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// MODELS
+
+model RFPStatus {
+  id    String  @id @default(uuid())
+  code  String  @unique // e.g., Draft, Published
+  label String
+  rfps  RFP[]
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  permissions Json
+  users       User[]
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  name               String             @default("User")   
+  email              String             @unique
+  password_hash      String
+  role_id            String
+  role               Role               @relation(fields: [role_id], references: [id])
+  status             String             @default("active") // active, inactive
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
+
+  rfps               RFP[]              @relation("BuyerRFPs")
+  supplier_responses SupplierResponse[] @relation("SupplierResponses")
+  documents          Document[]         @relation("Uploader")
+  audit_trails       AuditTrail[]       @relation("UserActions")
+  notifications      Notification[]
+}
+
+model RFP {
+  id                 String        @id @default(uuid())
+  title              String
+  status_id          String
+  status             RFPStatus     @relation(fields: [status_id], references: [id])
+  buyer_id           String
+  buyer              User          @relation("BuyerRFPs", fields: [buyer_id], references: [id])
+  
+  // Winner tracking
+  awarded_response_id String? @unique
+  awarded_response    SupplierResponse? @relation("AwardedResponse", fields: [awarded_response_id], references: [id])
+  
+  // Current version reference
+  current_version_id String?       @unique
+  current_version    RFPVersion?   @relation("CurrentRFPVersion", fields: [current_version_id], references: [id])
+  
+  // Timestamps
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+  deleted_at         DateTime?
+  closed_at          DateTime?
+  awarded_at         DateTime?
+  
+  versions           RFPVersion[]  @relation("RFPVersions")
+  supplier_responses SupplierResponse[] @relation("RFPResponses")
+}
+
+model RFPVersion {
+  id              String   @id @default(uuid())
+  rfp             RFP      @relation("RFPVersions", fields: [rfp_id], references: [id])
+  rfp_id          String
+  version_number  Int
+
+  description     String
+  requirements    String
+  budget_min      Float?
+  budget_max      Float?
+  deadline        DateTime
+
+  notes           String?
+  created_at      DateTime @default(now())
+  
+  documents       Document[]
+  
+  // Reverse relation for current version
+  current_for_rfp RFP?     @relation("CurrentRFPVersion")
+}
+
+model Document {
+  id                 String   @id @default(uuid())
+  file_name          String
+  url                String
+  file_type          String?   // pdf, image, docx
+  created_at         DateTime @default(now())
+  deleted_at         DateTime? // Soft delete field
+
+  uploader           User     @relation("Uploader", fields: [uploader_id], references: [id])
+  uploader_id        String
+
+  // Supplier side
+  rfp_response       SupplierResponse? @relation(fields: [rfp_response_id], references: [id])
+  rfp_response_id    String?
+
+  // Buyer side
+  rfp_version        RFPVersion? @relation(fields: [rfp_version_id], references: [id])
+  rfp_version_id     String?
+}
+
+
+model SupplierResponseStatus {
+  id    String  @id @default(uuid())
+  code  String  @unique   // Draft, Submitted
+  label String
+  responses SupplierResponse[]
+}
+
+model SupplierResponse {
+  id              String    @id @default(uuid())
+  rfp_id          String
+  rfp             RFP       @relation("RFPResponses", fields: [rfp_id], references: [id])
+  supplier_id     String
+  supplier        User      @relation("SupplierResponses", fields: [supplier_id], references: [id])
+
+  status_id       String
+  status          SupplierResponseStatus @relation(fields: [status_id], references: [id])
+
+  proposed_budget Float?
+  timeline        String?
+  cover_letter    String?
+  rejection_reason String?
+  documents       Document[]
+
+  // Timestamps
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  submitted_at    DateTime?
+  reviewed_at     DateTime?
+  decided_at      DateTime?
+
+  // Reverse relation for awarded response
+  awarded_for_rfp RFP? @relation("AwardedResponse")
+}
+
+model AuditTrail {
+  id          String   @id @default(uuid())
+  user        User?    @relation("UserActions", fields: [user_id], references: [id])
+  user_id     String?
+  action      String
+  target_type String?
+  target_id   String?
+  details     Json?
+  created_at  DateTime @default(now())
+}
+
+model NotificationTemplate {
+  id            String   @id @default(uuid())
+  code          String   @unique   // e.g. RFP_PUBLISHED, RESPONSE_SUBMITTED
+  title         String
+  message       String   // use placeholders like {{rfp_title}}, {{supplier_name}}
+  channel       String   // EMAIL, IN_APP, BOTH
+  created_at    DateTime @default(now())
+
+  notifications Notification[]
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  user_id       String
+  user          User     @relation(fields: [user_id], references: [id])
+  template_code String
+  template      NotificationTemplate @relation(fields: [template_code], references: [code])
+  data          Json?     // runtime values to replace placeholders
+  is_read       Boolean   @default(false)
+  created_at    DateTime  @default(now())
+  sent_at       DateTime?
+}
